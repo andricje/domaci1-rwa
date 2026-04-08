@@ -12,7 +12,7 @@ Ovaj repozitorijum sadrži jednostavan HTTP server (ručna implementacija preko 
   - `POST /save-quote` — čuva citat iz forme (`application/x-www-form-urlencoded`) i vraća **302 Redirect** na `/quotes`.
 
 - **Pomoćni servis** (`http.AuxiliaryServer`, port **8081**):
-  - `GET /qod` — vraća **JSON** sa nasumično izabranim citatom iz unapred definisanog skupa (`quote`, `author`).
+  - `GET /qod` — vraća **JSON** sa nasumično izabranim citatom dana (`quote`, `author`).
   - Posmatra se kao **interni** servis: glavni servis ga poziva prilikom generisanja `/quotes`, dok klijent (browser) komunicira sa glavnim.
 
 ## Arhitektura
@@ -68,6 +68,8 @@ Napomena: ako ne koristiš IntelliJ build output (`out/production/...`), možeš
 ## Tehničke napomene
 
 - Citati koje korisnik unosi čuvaju se **samo u radnoj memoriji** procesa glavnog servisa; restart briše listu.
+- Svaki uneti citat se dodatno upisuje u lokalni fajl **`data/quotes.jsonl`** (JSON po liniji). Pomoćni servis zatim za `/qod` **prvo bira** citat iz tog fajla; ako fajl ne postoji ili je prazan, koristi ugrađeni “fallback” skup citata.
+- Folder **`data/`** je u `.gitignore` (lokalni pool se ne komituje).
 - Forma šalje polja `text` i `author`; prazan tekst citata se ne čuva.
 - HTML sadržaj koji dolazi od korisnika prikazuje se kroz **escape** znakova (`&`, `<`, `>`, `"`) radi osnovne zaštite od XSS.
 
