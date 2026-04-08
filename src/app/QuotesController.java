@@ -6,7 +6,11 @@ import http.response.RedirectResponse;
 import http.response.Response;
 
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.io.OutputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.net.Socket;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
@@ -24,6 +28,8 @@ public class QuotesController extends Controller {
     private static final int AUX_PORT = 8081;
     private static final String AUX_HOST = "localhost";
     private static final String AUX_PATH = "/qod";
+
+    private static final Path QUOTES_POOL_FILE = Path.of("data", "quotes.jsonl");
 
     private static final List<Quote> STORED = Collections.synchronizedList(new ArrayList<>());
     private static final Gson GSON = new Gson();
@@ -82,10 +88,28 @@ public class QuotesController extends Controller {
         String author = form.getOrDefault("author", "").trim();
 
         if (!text.isEmpty()) {
-            STORED.add(new Quote(text, author));
+            Quote q = new Quote(text, author);
+            STORED.add(q);
+            appendToQodPoolFile(q);
         }
 
         return new RedirectResponse("/quotes");
+    }
+
+    private static void appendToQodPoolFile(Quote q) {
+        try {
+            Files.createDirectories(QUOTES_POOL_FILE.getParent());
+            String jsonLine = GSON.toJson(Map.of("quote", q.text, "author", q.author)) + "\n";
+            Files.writeString(
+                    QUOTES_POOL_FILE,
+                    jsonLine,
+                    StandardCharsets.UTF_8,
+                    StandardOpenOption.CREATE,
+                    StandardOpenOption.WRITE,
+                    StandardOpenOption.APPEND);
+        } catch (IOException ignored) {
+            // If disk write fails we still keep it in memory for /quotes list.
+        }
     }
 
     private static Map<String, String> parseForm(String body) {
