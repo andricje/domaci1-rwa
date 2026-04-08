@@ -1,2 +1,6 @@
 target/
 lib/*.jar
+.DS_Store
+out/
+*.iml
+gson-*.jar

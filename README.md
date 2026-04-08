@@ -1,19 +1,19 @@
 # Quotes Management (domaći 1 — RWA)
 
-Jednostavan sistem za **unos, čuvanje i prikaz citata** u browseru, sa **dva HTTP servisa** na `localhost` i **citat dana** koji dolazi sa pomoćnog servisa u JSON formatu.
+Ovaj repozitorijum sadrži jednostavan HTTP server (ručna implementacija preko `ServerSocket`/`Socket`) kome je dodata funkcionalnost za **unos, čuvanje i prikaz citata**, uz **citat dana** koji se dobija od posebnog pomoćnog servisa u JSON formatu.
 
 ## Šta radi aplikacija
 
-- **Glavni servis** (`quotes.MainServer`, port **8080**):
+- **Glavni servis** (`http.Server`, port **8080**):
   - `GET /quotes` — HTML stranica sa:
     - blokom **citat dana** (podaci se dobijaju od pomoćnog servisa),
     - formom za novi citat (tekst + autor),
     - listom svih sačuvanih citata (u memoriji, redosled: najnoviji prvi).
   - `POST /save-quote` — čuva citat iz forme (`application/x-www-form-urlencoded`) i vraća **302 Redirect** na `/quotes`.
 
-- **Pomoćni servis** (`quotes.AuxiliaryServer`, port **8081**):
-  - `GET /qod` — vraća **JSON** sa nasumično izabranim citatom iz unapred definisanog skupa polja `quote` i `author`.
-  - Namenjen je kao **interni** servis: u scenariju zadatka klijent (browser) komunicira samo sa glavnim; glavni ga poziva kada gradi stranicu `/quotes`.
+- **Pomoćni servis** (`http.AuxiliaryServer`, port **8081**):
+  - `GET /qod` — vraća **JSON** sa nasumično izabranim citatom iz unapred definisanog skupa (`quote`, `author`).
+  - Posmatra se kao **interni** servis: glavni servis ga poziva prilikom generisanja `/quotes`, dok klijent (browser) komunicira sa glavnim.
 
 ## Arhitektura
 
@@ -26,47 +26,44 @@ flowchart LR
   M -->|HTTP GET preko Socket-a| A
 ```
 
-Komunikacija **između** glavnog i pomoćnog servisa je implementirana **ručno preko `java.net.Socket`** (sastavljen je sirovi HTTP zahtev/odgovor). **Nije** korišćen gotov HTTP klijent. Za **parsiranje i generisanje JSON-a** korišćena je biblioteka **org.json** (`org.json:json`), u skladu sa ograničenjem zadatka.
+Komunikacija **između** glavnog i pomoćnog servisa je implementirana **ručno preko `java.net.Socket`** (sastavljen je sirovi HTTP zahtev/odgovor). **Nije** korišćen gotov HTTP klijent. Za **parsiranje i generisanje JSON-a** korišćena je biblioteka **Gson** (`com.google.gson`), u skladu sa ograničenjem zadatka (dozvoljene JSON biblioteke).
 
 ## Preduslovi
 
-- **Java 17** (ili novija, kompatibilna sa `release 17` u `pom.xml` i `build.sh`).
+- **Java** (preporuka: 17+)
 
 ## Pokretanje
 
 Pomoćni servis mora biti dostupan dok glavni servis generiše stranicu sa citatom dana (inače se prikaže poruka da citat dana nije dostupan).
 
-### Varijanta A — Maven
+### Pokretanje (bez Maven-a)
+
+U dva terminala:
 
 ```bash
-mvn -q package
-CP="target/classes:target/dependency/*"
-java -cp "$CP" quotes.AuxiliaryServer   # terminal 1
-java -cp "$CP" quotes.MainServer        # terminal 2
+# terminal 1 (pomoćni)
+java -cp "out/production/HTTP_primer:gson-2.8.2.jar" http.AuxiliaryServer
+```
+
+```bash
+# terminal 2 (glavni)
+java -cp "out/production/HTTP_primer:gson-2.8.2.jar" http.Server
 ```
 
 Zatim u browseru otvori: [http://localhost:8080/quotes](http://localhost:8080/quotes).
 
-### Varijanta B — `build.sh` (bez Maven-a)
-
-Skripta preuzima JAR za `org.json` u `lib/` (ako nedostaje), kompajlira izvore u `target/classes`:
-
-```bash
-chmod +x build.sh
-./build.sh
-java -cp "target/classes:lib/json-20240303.jar" quotes.AuxiliaryServer
-java -cp "target/classes:lib/json-20240303.jar" quotes.MainServer
-```
+Napomena: ako ne koristiš IntelliJ build output (`out/production/...`), možeš kompajlirati ručno (npr. `javac`) uz `gson` na classpath-u.
 
 ## Struktura repozitorijuma
 
 | Putanja | Opis |
 |--------|------|
-| `src/main/java/quotes/MainServer.java` | Glavni HTTP server, rute, HTML, poziv pomoćnog preko Socket-a |
-| `src/main/java/quotes/AuxiliaryServer.java` | Pomoćni server, `GET /qod`, JSON |
-| `pom.xml` | Maven projekat, zavisnost `org.json`, kopiranje zavisnosti u `target/dependency` pri `package` |
-| `build.sh` | Alternativna kompilacija sa `javac` + JAR iz Maven Central-a |
-| `.gitignore` | Ignoriše `target/` i `lib/*.jar` |
+| `src/http/Server.java` | Glavni server (sluša na `:8080`, koristi `ServerThread`) |
+| `src/http/ServerThread.java` | Parsiranje HTTP zahteva (uklj. `Content-Length`), prosleđivanje na `RequestHandler` |
+| `src/app/RequestHandler.java` | Rutiranje (`/quotes`, `/save-quote`, …) |
+| `src/app/QuotesController.java` | HTML za `/quotes`, čuvanje citata, poziv pomoćnog servisa preko Socket-a |
+| `src/http/AuxiliaryServer.java` | Pomoćni servis (`GET /qod`), JSON citat dana |
+| `.gitignore` | Ignoriše build output (`out/`, `target/`) i IDE fajlove |
 
 ## Tehničke napomene
 
