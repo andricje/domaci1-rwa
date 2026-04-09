@@ -11,12 +11,12 @@ import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Random;
 
 /**
  * Pomoćni servis: jedan endpoint vraća nasumično odabran "citat dana" u JSON formatu.
@@ -40,19 +40,18 @@ public class AuxiliaryServer {
     private static final Gson GSON = new Gson();
 
     public static void main(String[] args) {
-        Random rnd = new Random();
         try (ServerSocket ss = new ServerSocket(PORT)) {
             log("slušam na portu " + PORT + " — http://localhost:" + PORT + PATH);
             while (true) {
                 Socket client = ss.accept();
-                new Thread(() -> handle(client, rnd)).start();
+                new Thread(() -> handle(client)).start();
             }
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
 
-    private static void handle(Socket client, Random rnd) {
+    private static void handle(Socket client) {
         try (
                 Socket c = client;
                 BufferedReader in = new BufferedReader(new InputStreamReader(c.getInputStream(), StandardCharsets.ISO_8859_1));
@@ -87,7 +86,7 @@ public class AuxiliaryServer {
                 return;
             }
 
-            Quote pick = pickQuoteOfDay(rnd);
+            Quote pick = pickQuoteOfDay();
             Map<String, String> payload = new LinkedHashMap<>();
             payload.put("quote", pick.quote);
             payload.put("author", pick.author);
@@ -98,14 +97,16 @@ public class AuxiliaryServer {
         }
     }
 
-    private static Quote pickQuoteOfDay(Random rnd) {
+    private static Quote pickQuoteOfDay() {
+        long day = LocalDate.now().toEpochDay();
         // First, try dynamic pool created from user-submitted quotes.
         List<Quote> dynamic = readDynamicPool();
         if (!dynamic.isEmpty()) {
-            return dynamic.get(rnd.nextInt(dynamic.size()));
+            int idx = Math.floorMod(day, dynamic.size());
+            return dynamic.get(idx);
         }
         // Fallback to built-in pool.
-        int i = rnd.nextInt(POOL.length);
+        int i = Math.floorMod(day, POOL.length);
         return new Quote(POOL[i][0], POOL[i][1]);
     }
 
